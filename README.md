@@ -17,3 +17,11 @@ Chat API + FE pages + docs.
 - Backend: Django+DRF, Channels (WS).
 - Retrieval: TF-IDF stub.
 - Auth: Mock in Step1; Keycloak realm provided.
+
+
+
+# API
+- POST /api/upload  (multipart) → {status, files}
+- POST /api/chat/ask → {answer, citations[]}
+- GET  /api/health
+WS: /ws/progress
