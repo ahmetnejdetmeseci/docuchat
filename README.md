@@ -5,30 +5,30 @@ docker compose up --build
 ```
 Open http://localhost:8080/
 
-# 🧠 DocuChat – Document-Based Q&A (Step 1)
+# DocuChat – Document-Based Q&A (Step 1)
 
 DocuChat is a **Retrieval-Augmented Generation (RAG)** app: upload documents, ask questions, get concise answers **with citations**.  
 This Step-1 MVP uses **Django + React + Docker** and integrates **Gemini 2.5 Flash** for answer generation.
 
 ---
 
-## ✨ Features
+## Features
 
-- 📤 **Upload & index** PDFs/TXT into chunked storage (page-aware)
-- 🔎 **TF-IDF retrieval** (simple, fast; embeddings planned for Step 2)
-- 🤖 **Gemini 2.5 Flash** answers strictly from provided context
-- 📑 **Citations**: `doc`, `page`, `chunk_id`, `quote`, `snippet`
-- 🧩 **Dockerized stack**: Postgres, Redis, NGINX, Backend, Frontend
-- 🔐 **Auth mocked** for Step 1 (Keycloak container prepared)
+- **Upload & index** PDFs/TXT into chunked storage (page-aware)
+   **TF-IDF retrieval** (simple, fast; embeddings planned for Step 2)
+-  **Gemini 2.5 Flash** answers strictly from provided context
+- **Citations**: `doc`, `page`, `chunk_id`, `quote`, `snippet`
+- **Dockerized stack**: Postgres, Redis, NGINX, Backend, Frontend
+- **Auth mocked** for Step 1 (Keycloak container prepared)
 
 ---
 
-## 🏗 Tech Stack
+## Tech Stack
 
 - **Frontend**: React + TypeScript + Ant Design  
 - **Backend**: Django REST Framework (Channels-ready)  
 - **Search**: TF-IDF (scikit-learn) → (Step 2: embeddings)  
-- **DB**: PostgreSQL 15-alpine  
+- *DB**: PostgreSQL 15-alpine  
 - **Cache/Broker**: Redis 7  
 - **LLM**: Google **Gemini 2.5 Flash**  
 - **Infra**: Docker Compose + **NGINX** reverse proxy
@@ -55,7 +55,7 @@ Chat API + FE pages + docs.
 - GET  /api/health
 WS: /ws/progress
 
-## 📦 Repository Structure
+## Repository Structure
 .
 ├── backend/
 │ ├── apps/
