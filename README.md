@@ -3,6 +3,12 @@ Run:
 cp .env.sample .env
 docker compose up --build
 ```
+
+---
+🧠 **Submission Info**
+
+This repository was created for the DocuChat Step-1 MVP (Excellence Cloud Interview Challenge).  
+Completed by **Ahmet Nejdet Meşeci** on **October 5 2025**.
 Open http://localhost:8080/
 
 # DocuChat – Document-Based Q&A (Step 1)
