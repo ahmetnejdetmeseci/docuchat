@@ -23,19 +23,19 @@ We chose a **TF-IDF based retriever** instead of vector embeddings (FAISS / pgve
 - Encourages concise, citation-grounded responses
 
 
-## 🔐 Authentication & Login
+## Authentication & Login
 
 DocuChat includes a **fully integrated Keycloak authentication system**, but for this version (Step 1), it is **not enforced**.  
 The frontend currently runs on a **mock login mode** for easier local testing and faster iteration.
 
-### 🔸 Keycloak Integration
+###  Keycloak Integration
 - Keycloak is configured as a standalone container in Docker Compose (`docu_keycloak`).
 - Default admin credentials: `admin / admin`
 - Realm configuration is automatically imported from `realm-export.json`.
 - The service runs at **http://localhost:8081**.
 - Frontend and backend are already compatible with Keycloak-based OIDC flow.
 
-### 🔸 Mock Login (Active in Step 1)
+### Mock Login (Active in Step 1)
 - During Step 1 development, the app uses a *mock login provider* instead of real authentication.
 - This allows full functionality (upload, chat, citations) **without requiring a Keycloak session**.
 - The login page still reflects the actual flow but bypasses Keycloak for simplicity.
