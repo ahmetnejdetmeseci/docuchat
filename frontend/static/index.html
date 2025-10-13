@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>DocuChat (Step-2, Tenants)</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; margin: 20px; }
+    .card { border:1px solid #e5e7eb; border-radius:8px; padding:12px; margin-top:12px; }
+    .row { display:flex; gap:8px; align-items:center; }
+    input, select { padding:8px; }
+    button { padding:8px 12px; cursor:pointer; }
+    code { background:#f3f4f6; padding:2px 4px; border-radius:4px; }
+    ul { padding-left: 20px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <h1>DocuChat</h1>
+  <div class="row">
+    <label>Tenant:</label>
+    <input id="tenant" value="demo"/>
+    <button onclick="setTenant()">Use</button>
+    <span id="tenantStatus"></span>
+  </div>
+
+  <div class="card">
+    <h3>Uploads</h3>
+    <div class="row">
+      <input type="file" id="files" multiple/>
+      <button id="btnUpload" onclick="doUpload()">Upload</button>
+      <button onclick="refreshUploads()">Refresh</button>
+    </div>
+  
+    <!-- Progress Bar -->
+    <div id="uploadProgressWrap" style="margin-top:8px; display:none;">
+      <div style="height:8px; background:#e5e7eb; border-radius:6px; overflow:hidden;">
+        <div id="uploadProgressBar" style="height:8px; width:0%; background:#60a5fa;"></div>
+      </div>
+      <div id="uploadProgressText" class="mono" style="font-size:12px; margin-top:4px;">0%</div>
+    </div>
+  
+    <div id="uploads" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="card">
+    <h3>Chat</h3>
+    <div class="row">
+      <input id="q" placeholder="Ask about your docs…" style="flex:1"/>
+      <button onclick="ask()">Ask</button>
+    </div>
+    <div id="answer" class="mono" style="white-space: pre-wrap;"></div>
+    <div id="cites"></div>
+  </div>
+
+  <div class="card">
+    <h3>Agent</h3>
+    <div class="row">
+      <input id="topic" placeholder="Research topic…" style="flex:1"/>
+      <button onclick="createTask()">Create</button>
+    </div>
+    <div style="margin-top:8px" id="taskInfo"></div>
+    <div id="steps"></div>
+    <div id="report" class="mono" style="white-space: pre-wrap;"></div>
+  </div>
+
+<script>
+
+  // Global değişkenler:
+  let CURRENT_TASK_ID = null;
+  let CURRENT_STATUS = null;
+  let CURRENT_REPORT_URL = null;
+
+  function renderTaskInfo() {
+    const el = document.getElementById("taskInfo");
+    if (!el) return;
+    el.innerHTML = "";
+
+    if (!CURRENT_TASK_ID) return;
+
+    let url = CURRENT_REPORT_URL;
+
+    // tenant paramı yoksa ekle
+    if (url && !url.includes("tenant=")) {
+      const sep = url.includes("?") ? "&" : "?";
+      url = url + sep + "tenant=" + encodeURIComponent(TENANT);
+    }
+
+    const btn = document.createElement("a");
+    btn.href = url;
+    btn.target = "_blank";
+    btn.rel = "noopener";
+
+    const span = document.createElement("span");
+    span.textContent = `Task ${CURRENT_TASK_ID} • Status ${CURRENT_STATUS || "queued"}`;
+    el.appendChild(span);
+
+    // Eğer DONE ise ve rapor linkimiz varsa buton oluştur
+    if ((CURRENT_STATUS || "").toLowerCase() === "done" && CURRENT_REPORT_URL) {
+      const btn = document.createElement("a");
+      btn.href = CURRENT_REPORT_URL;
+      btn.target = "_blank";
+      btn.rel = "noopener";
+      btn.textContent = "Open report";
+      btn.style.display = "inline-block";
+      btn.style.marginLeft = "8px";
+      btn.style.padding = "6px 10px";
+      btn.style.border = "1px solid #e5e7eb";
+      btn.style.borderRadius = "6px";
+      btn.style.textDecoration = "none";
+      btn.style.background = "#f8fafc";
+      btn.style.fontWeight = "600";
+      el.appendChild(btn);
+    }
+  }
+
+  const API = "/api";
+  const WS_BASE = (location.protocol.replace('http','ws') + '//' + location.host + '/ws');
+
+  let TENANT = localStorage.getItem("tenant") || "demo";
+
+  function setTenant() {
+    TENANT = document.getElementById("tenant").value || "demo";
+    localStorage.setItem("tenant", TENANT);
+    document.getElementById("tenantStatus").innerText = "• Using tenant: " + TENANT;
+    refreshUploads();
+  }
+  setTenant();
+
+  async function refreshUploads() {
+  const r = await fetch(API + "/uploads/list", { headers: { "X-Tenant": TENANT }});
+  const data = await r.json();
+  const el = document.getElementById("uploads");
+
+  const items = (data.items || []);
+  if (!items.length) {
+    el.innerHTML = `<div style="color:#6b7280">No files uploaded yet.</div>`;
+    return;
+  }
+
+  // Basit tablo
+  const rows = items.map(d => {
+    const created = d.created_at ? new Date(d.created_at).toLocaleString() : "-";
+    const size = (typeof d.size === "number" && d.size >= 0) ? `${(d.size/1024).toFixed(1)} KB` : "";
+    return `
+      <tr>
+        <td style="padding:6px 8px; border-bottom:1px solid #eee;">${d.filename}</td>
+        <td style="padding:6px 8px; border-bottom:1px solid #eee; color:#6b7280;">${created}</td>
+        <td style="padding:6px 8px; border-bottom:1px solid #eee; color:#6b7280;">${size}</td>
+        <td style="padding:6px 8px; border-bottom:1px solid #eee; text-align:right;">
+          <button onclick="deleteUpload(${d.id})" style="
+              padding:6px 10px; border:1px solid #ef4444; color:#ef4444; background:#fff;
+              border-radius:6px; cursor:pointer;">Delete</button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  el.innerHTML = `
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="text-align:left; padding:6px 8px;">File</th>
+          <th style="text-align:left; padding:6px 8px;">Created</th>
+          <th style="text-align:left; padding:6px 8px;">Size</th>
+          <th style="text-align:right; padding:6px 8px;">Action</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+  refreshUploads();
+
+  function setUploadUI(active, pct = 0) {
+  const wrap = document.getElementById("uploadProgressWrap");
+  const bar = document.getElementById("uploadProgressBar");
+  const txt = document.getElementById("uploadProgressText");
+  const btn = document.getElementById("btnUpload");
+  if (active) {
+    wrap.style.display = "block";
+    bar.style.width = Math.max(0, Math.min(100, pct)) + "%";
+    txt.textContent = Math.max(0, Math.min(100, Math.round(pct))) + "%";
+    btn.disabled = true;
+  } else {
+    wrap.style.display = "none";
+    bar.style.width = "0%";
+    txt.textContent = "0%";
+    btn.disabled = false;
+  }
+}
+
+function doUpload() {
+  const input = document.getElementById("files");
+  const files = input.files;
+  if (!files || !files.length) {
+    alert("Select files first.");
+    return;
+  }
+
+  const fd = new FormData();
+  for (let i = 0; i < files.length; i++) {
+    fd.append("files", files[i]);
+  }
+
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/uploads/upload", true);
+  xhr.setRequestHeader("X-Tenant", TENANT);
+
+  xhr.upload.onprogress = function (e) {
+    if (e.lengthComputable) {
+      const pct = (e.loaded / e.total) * 100;
+      setUploadUI(true, pct);
+    }
+  };
+
+  xhr.onreadystatechange = function () {
+    if (xhr.readyState === 4) {
+      try {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          // Başarılı
+          setUploadUI(false, 100);
+          refreshUploads();
+          alert("Uploaded: " + (JSON.parse(xhr.responseText).files || []).join(", "));
+        } else {
+          setUploadUI(false, 0);
+          alert("Upload failed: " + xhr.status + " " + xhr.responseText);
+        }
+      } catch (err) {
+        setUploadUI(false, 0);
+        alert("Upload failed.");
+      }
+    }
+  };
+
+  // Başlat
+  setUploadUI(true, 0);
+  xhr.send(fd);
+}
+
+  async function deleteUpload(id) {
+    if (!confirm("Delete this file?")) return;
+    const r = await fetch(API + "/uploads/" + id, {
+      method: "DELETE",
+      headers: { "X-Tenant": TENANT }
+    });
+    if (r.ok) {
+      refreshUploads();
+    } else {
+      const txt = await r.text();
+      alert("Delete failed: " + txt);
+    }
+  }
+  async function ask() {
+    const q = document.getElementById("q").value;
+    const r = await fetch(API + "/chat/ask", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "X-Tenant": TENANT },
+      body: JSON.stringify({ q })
+    });
+    const data = await r.json();
+    document.getElementById("answer").innerText = data.answer || "";
+    const cites = (data.citations||[]).map((c,i)=>`<li><b>${c.doc}</b> • chunk:${c.chunk_id} ${c.page?("• p."+c.page):""}<br/><em>"${(c.quote||"").replace(/</g,'&lt;')}"</em></li>`).join("");
+    document.getElementById("cites").innerHTML = "<b>Citations</b><ul>"+cites+"</ul>";
+  }
+
+  let sock = null;
+  async function createTask() {
+  const topic = document.getElementById("topic").value;
+  const r = await fetch(API + "/agent/tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Tenant": TENANT },
+    body: JSON.stringify({ topic })
+  });
+  const data = await r.json();
+
+  CURRENT_TASK_ID = data.id;
+  CURRENT_STATUS = data.status || "queued";
+  CURRENT_REPORT_URL = data.report_url || null;
+  renderTaskInfo();
+
+  const group = data.group;
+
+  if (sock) sock.close();
+  sock = new WebSocket(`${WS_BASE}/agent/${group}/`);
+
+  sock.onmessage = async (ev) => {
+    const msg = JSON.parse(ev.data);
+
+    if (msg.type === "status") {
+      CURRENT_STATUS = msg.data.status || CURRENT_STATUS;
+      renderTaskInfo();
+    }
+
+    if (msg.type === "plan") {
+      const steps = document.getElementById("steps");
+      const li = document.createElement("div");
+      li.innerText = "• " + msg.data.msg;
+      steps.appendChild(li);
+    }
+
+    if (msg.type === "done") {
+      CURRENT_STATUS = "done";
+      if (msg.data && msg.data.report_url) {
+        CURRENT_REPORT_URL = msg.data.report_url;
+      }
+      renderTaskInfo();
+
+      const reportBox = document.getElementById("report");
+      if (msg.data && msg.data.report_md) {
+        reportBox.innerText = msg.data.report_md;
+      } else {
+        const rr = await fetch(API + "/agent/tasks/" + CURRENT_TASK_ID, {
+          headers: { "X-Tenant": TENANT }
+        });
+        const det = await rr.json();
+        reportBox.innerText = det.report_md || "No findings.";
+        if (det.report_url && !CURRENT_REPORT_URL) {
+          CURRENT_REPORT_URL = det.report_url;
+          renderTaskInfo();
+        }
+      }
+    }
+  };
+}
+</script>
+</body>
+</html>
