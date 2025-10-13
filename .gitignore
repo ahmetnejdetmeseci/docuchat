@@ -1,0 +1,11 @@
+.env
+*.db
+*.DS_Store
+
+.env.*
+
+/frontend/.cache/
+
+/backend/*.log
+
+*.log
