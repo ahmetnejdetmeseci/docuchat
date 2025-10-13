@@ -17,6 +17,18 @@ This package is a drop-in runnable Step-2 version with multi-tenant isolation, h
 - `GET /api/agent/tasks/<id>` — headers: `X-Tenant`
 - WebSocket: `ws://localhost:8080/ws/agent/<group>/`
 
+##Tenants
+DocuChat supports **multi-tenant isolation** — each tenant has its own documents, chat history, and agent tasks.
+
+Tenant selection is done through the HTTP header:
+
+**Key points:**
+- Every request (upload, chat, agent) must include this header.
+- Different tenants cannot see or query each other's files.
+- When a user types a new tenant name, it is automatically saved as a new tenant.
+- If a tenant does not exist, it is created automatically on first use.
+- The default tenant is `demo`.
+
 ## Notes
 - No Keycloak/OIDC here. Replace TenantMiddleware with real OIDC verification when needed.
 - `init_demo` seeds two tiny docs (including python.md with python version=3.11.x).
